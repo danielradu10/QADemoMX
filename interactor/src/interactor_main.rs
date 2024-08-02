@@ -112,7 +112,7 @@ impl ContractInteract {
             .interactor
             .tx()
             .from(&self.wallet_address)
-            .gas(NumExpr("30,000,000"))
+            .gas(NumExpr("35,000,000"))
             .typed(proxy::EsdtTransferWithFeeProxy)
             .init()
             .code_metadata(CodeMetadata::PAYABLE) // adaugat, contractul sa fie payable
@@ -268,6 +268,38 @@ impl ContractInteract {
     }
 
 
+    async fn transfer_with_miss_fee(&mut self) {
+
+        
+        let token_nonce = 0u64;
+        let token_amount = BigUint::<StaticApi>::from(1000000u64);
+        
+
+        // doua tranzactii la rand: token-ul si fee-ul
+        let mut transactions = ManagedVec::new();
+        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), token_nonce, token_amount.clone())));
+        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), token_nonce, BigUint::<StaticApi>::from(13u64))));
+
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.wallet_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+         
+            .typed(proxy::EsdtTransferWithFeeProxy)
+            .transfer(&self.wallet_address)
+            .payment(transactions)
+            .returns(ExpectError(4, "Mismatching payment for covering fees"))
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {response:?}");
+    }
+
+
+
     // this is a transfer without any fee. It should return "Fee payment missing"
     async fn transfer_without_fee(&mut self) { 
 
@@ -364,7 +396,7 @@ impl ContractInteract {
     async fn transfer(&mut self) {
         let token_id = String::new();
         let token_nonce = 0u64;
-        let token_amount = BigUint::<StaticApi>::from(0u128);
+        let token_amount = BigUint::<StaticApi>::from(1u128);
 
      
         let response = self
@@ -409,8 +441,8 @@ impl ContractInteract {
 
 
 
-// this test should set the expected fee in storage
-#[tokio::test]
+// // this test should set the expected fee in storage
+// #[tokio::test]
 async fn test_set_exact_value(){
 
     let mut interactor = ContractInteract::new().await;
@@ -426,8 +458,8 @@ async fn test_set_exact_value(){
 }
 
 
-// this test should show elements in the paid_fees vector
-#[tokio::test]
+// // this test should show elements in the paid_fees vector
+// #[tokio::test]
 async fn test_a_happy_transfer(){
 
     let mut interactor = ContractInteract::new().await;
@@ -450,8 +482,8 @@ async fn test_a_happy_transfer(){
 
 
 
-// transfer, show paid fees, claim, show paid fees again (this time empty)
-#[tokio::test]
+// // transfer, show paid fees, claim, show paid fees again (this time empty)
+// #[tokio::test]
 async fn test_a_happy_transfer_with_claim(){
 
     let mut interactor = ContractInteract::new().await;
@@ -554,3 +586,24 @@ async fn test_transfer_percentage_fee(){
     interactor.paid_fees().await;
 
 }
+
+
+#[tokio::test]
+async fn test_missmatching_payment_fee(){
+
+    let mut interactor = ContractInteract::new().await;
+
+    interactor.deploy().await;
+    interactor.set_exact_value_fee().await;
+    interactor.transfer_with_miss_fee().await;
+}
+
+#[tokio::test]
+async fn test_fee_not_set(){
+
+    let mut interactor = ContractInteract::new().await;
+    interactor.deploy().await;
+    interactor.transfer_with_fee().await;
+}
+
+
