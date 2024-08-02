@@ -92,7 +92,7 @@ impl ContractInteract {
 
     
         
-        let wallet_address = interactor.register_wallet(Wallet::from_pem_file("walletNew.pem").unwrap());
+        let wallet_address = interactor.register_wallet(Wallet::from_pem_file("eve.pem").unwrap());
     
         let contract_code = BytesValue::interpret_from(
             "mxsc:../output/esdt-transfer-with-fee.mxsc.json",
@@ -129,9 +129,9 @@ impl ContractInteract {
     }
 
     async fn set_exact_value_fee(&mut self) {
-        let fee_token = TokenIdentifier::from_esdt_bytes(&b""[..]);
-        let fee_amount = BigUint::<StaticApi>::from(0u128);
-        let token = TokenIdentifier::from_esdt_bytes(&b""[..]);
+        let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+        let fee_amount = BigUint::<StaticApi>::from(1u128);
+        let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
 
         let response = self
             .interactor
@@ -155,9 +155,9 @@ impl ContractInteract {
     async fn set_exact_value_fee_with_params(&mut self) {
        
         
-        let fee_token = TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]);
+        let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
         let fee_amount = BigUint::<StaticApi>::from(13u128);
-        let token = TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]);
+        let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
 
 
 
@@ -180,8 +180,8 @@ impl ContractInteract {
 
 
     async fn set_percentage_fee(&mut self) {
-        let fee = 0u32;
-        let token = TokenIdentifier::from_esdt_bytes(&b""[..]);
+        let fee = 2u32;
+        let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
 
         let response = self
             .interactor
@@ -209,12 +209,27 @@ impl ContractInteract {
             .typed(proxy::EsdtTransferWithFeeProxy)
             .claim_fees()
             .returns(ReturnsResultUnmanaged)
-           // .returns(ReturnsResultUnmanaged)
             .prepare_async()
             .run()
             .await;
 
         println!("Result: {response:?}");
+    }
+
+    async fn claim_fees_fail(&mut self, expected_result: ExpectError<'_>) {
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.wallet_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::EsdtTransferWithFeeProxy)
+            .claim_fees()
+            .returns(expected_result)
+            .prepare_async()
+            .run()
+            .await;
+
     }
 
     // Owner-ul seteaza in storage ExactValueFee: 
@@ -230,8 +245,8 @@ impl ContractInteract {
 
         // doua tranzactii la rand: token-ul si fee-ul
         let mut transactions = ManagedVec::new();
-        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]), token_nonce, token_amount.clone())));
-        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]), token_nonce, BigUint::<StaticApi>::from(13u64))));
+        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), token_nonce, token_amount.clone())));
+        transactions.push((EsdtTokenPayment::new(TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), token_nonce, BigUint::<StaticApi>::from(13u64))));
 
         let response = self
             .interactor
@@ -269,7 +284,7 @@ impl ContractInteract {
          
             .typed(proxy::EsdtTransferWithFeeProxy)
             .transfer(&self.wallet_address)
-            .payment(((TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]), token_nonce, token_amount)))
+            .payment(((TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), token_nonce, token_amount)))
             .returns(ExpectError(4, "Fee payment missing"))
             .prepare_async()
             .run()
@@ -278,10 +293,40 @@ impl ContractInteract {
         println!("Result: {response:?}");
     }
 
+    async fn transfer_without_proper_fee(&mut self, expected_result: ExpectError<'_>) {
+        let token_identifier = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+        let token2_identifier = TokenIdentifier::from_esdt_bytes(&b"XMAS-43a751"[..]);
+        let token_nonce = 0u64;
+        let token_amount = BigUint::<StaticApi>::from(2u128);
+        
+    
+        let mut transactions = ManagedVec::new();
+        // Payment of the token itself, without the required fee payment
+        transactions.push(EsdtTokenPayment::new(token_identifier.clone(), token_nonce, token_amount.clone()));
+        transactions.push(EsdtTokenPayment::new(token2_identifier.clone(), token_nonce, token_amount.clone()));
+
+    
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.wallet_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::EsdtTransferWithFeeProxy)
+            .transfer(&self.wallet_address)
+            .payment(transactions)
+            .returns(expected_result)
+            .prepare_async()
+            .run()
+            .await;
+    
+        println!("Result: {response:?}");
+    }
+
 
 
     async fn token_fee(&mut self) {
-        let token = TokenIdentifier::from_esdt_bytes(&b"TEST3-44c6d1"[..]);
+        let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
 
         let result_value = self
             .interactor
@@ -464,3 +509,48 @@ async fn test_simple_transfer_with_egld(){
 
 }
 
+// this test should return "There is nothing to claim"
+#[tokio::test]
+async fn test_claim_with_no_fees() {        
+    let mut interactor = ContractInteract::new().await;
+
+    interactor.deploy().await;
+
+    interactor.claim_fees_fail(ExpectError(4, "There is nothing to claim")).await;
+
+}
+
+
+// this test should return "Wrong fee token"
+#[tokio::test]
+async fn test_transfer_with_wrong_fee_token() {
+    let mut interactor = ContractInteract::new().await;
+    interactor.deploy().await;
+
+    interactor.set_exact_value_fee().await;
+
+    interactor.transfer_without_proper_fee(ExpectError(4, "Wrong fee token")).await;
+
+}
+
+// this test should make a transaction with a percentage fee
+#[tokio::test]
+async fn test_transfer_percentage_fee(){
+
+    let mut interactor = ContractInteract::new().await;
+
+    interactor.deploy().await;
+
+    interactor.paid_fees().await;
+    
+    interactor.set_percentage_fee().await;
+
+    interactor.transfer_with_fee().await;
+
+    interactor.paid_fees().await;
+
+    interactor.claim_fees().await;
+
+    interactor.paid_fees().await;
+
+}
