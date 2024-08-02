@@ -92,7 +92,7 @@ impl ContractInteract {
 
     
         
-        let wallet_address = interactor.register_wallet(Wallet::from_pem_file("eve.pem").unwrap());
+        let wallet_address = interactor.register_wallet(Wallet::from_pem_file("walletNew.pem").unwrap());
     
         let contract_code = BytesValue::interpret_from(
             "mxsc:../output/esdt-transfer-with-fee.mxsc.json",
