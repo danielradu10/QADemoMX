@@ -236,7 +236,7 @@ impl ContractInteract {
     ) {
         let token_nonce = 0u64; 
         let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
-        let fee_amount = BigUint::<StaticApi>::from(10u128);
+        let fee_amount = BigUint::<StaticApi>::from(9u128);
         let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
         let token_amount = BigUint::<StaticApi>::from(13u64);       
 
