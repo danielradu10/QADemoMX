@@ -3,6 +3,7 @@
 mod proxy;
 
 use multiversx_sc_snippets::imports::*;
+use proxy::Fee;
 
 use crate::sdk::wallet::Wallet;
 use multiversx_sc_snippets::sdk;
@@ -16,6 +17,10 @@ use std::{
 const GATEWAY: &str = sdk::gateway::DEVNET_GATEWAY;
 //blockchain::DEVNET_GATEWAY;
 const STATE_FILE: &str = "state.toml";
+//const GATEWAY: &str =  "http://localhost:8085";
+//const GENERATE_BLOCKS_URL: = f"{SIMULATOR_URL}/simulator/generate-blocks"
+//GENERATE_BLOCKS_UNTIL_TX_PROCESSED = f"{SIMULATOR_URL}/simulator/generate-blocks-until-transaction-processed"
+
 
 
 #[tokio::main]
@@ -141,6 +146,7 @@ impl ContractInteract {
             .await;
 
         println!("Result: {response:?}");
+        
     }
 
     async fn set_percentage_fee(&mut self, fee: u32, token: TokenIdentifier<StaticApi>) {
@@ -230,7 +236,7 @@ impl ContractInteract {
     }
 
 
-    async fn transfer_with_miss_fee(    //inainte de refactor pentru ca da failed
+    async fn transfer_with_miss_fee(   
         &mut self,
         expected_result: ExpectError<'_>,
         token: TokenIdentifier<StaticApi>,
@@ -610,4 +616,87 @@ async fn test_fee_not_set(){
     interactor.transfer_with_fee(token_identifier,token_amount,fee_token_identifier,fee_amount).await;
 }
 
+// #[tokio::test]
+// async fn test_transfer_with_big_value(){
+
+//     let mut interactor = ContractInteract::new().await;
+//     let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+//     let fee_amount = BigUint::<StaticApi>::from(10u128);
+//     let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+
+//     interactor.deploy().await;
+//     interactor.set_exact_value_fee(token.clone(),fee_amount.clone(),fee_token.clone()).await;
+
+//     let token_amount = BigUint::<StaticApi>::from(340282366920938463463374607431768211455u128);
+
+//     interactor.transfer_with_fee(token.clone(),token_amount,fee_token.clone(),fee_amount.clone()).await;
+// }
+
+#[tokio::test]
+async fn test_all(){
+    let mut interactor = ContractInteract::new().await;
+
+    interactor.deploy().await;
+
+    println!("----------------------------------------------------");
+    let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+    interactor.token_fee(fee_token.clone()).await;
+    let mut fee_amount = BigUint::<StaticApi>::from(10u128);
+    interactor.transfer_with_fee(TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]), BigUint::<StaticApi>::from(1000u64), fee_token.clone(), fee_amount.clone()).await;
+    println!("The transfer should work and paid_fees should be empty");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    interactor.set_exact_value_fee(fee_token.clone(), fee_amount.clone(), fee_token.clone()).await;
+    println!("The fee should be set");
+    interactor.token_fee(fee_token.clone()).await;
+    println!("----------------------------------------------------");
+    let token_amount = BigUint::<StaticApi>::from(1000u64);
+    println!("EGLD transaction");
+    interactor.transfer_with_egld(token_amount.clone()).await;
+    println!("The EGLD transaction should fail and paid_fees should be empty");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+
+    let token_identifier = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+
+    interactor.transfer_with_fee(token_identifier.clone(), token_amount.clone(), fee_token.clone(), fee_amount.clone()).await;
+    println!("The transfer should be successful and paid_fees should contain the fee");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    interactor.transfer_with_fee(token_identifier.clone(), token_amount.clone(), fee_token.clone(), fee_amount.clone()).await;
+    interactor.transfer_with_fee(token_identifier.clone(), token_amount.clone(), fee_token.clone(), fee_amount.clone()).await;
+    println!("After 3 transactions with exact fee value");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    interactor.set_percentage_fee(10, fee_token.clone());
+    println!("The fee should be set as percentage");
+    interactor.token_fee(fee_token.clone()).await;
+    interactor.transfer_with_fee(token_identifier.clone(), token_amount.clone(), fee_token.clone(), fee_amount.clone()).await;
+    println!("The transfer with percentage fee should be successful and paid_fees should contain the fee");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    println!("Claiming fees");
+    interactor.claim_fees().await;
+    println!("The paid_fees should be empty after claiming");
+    interactor.paid_fees().await;
+    println!("Claiming fees again");
+    interactor.claim_fees_error(ExpectError(4, "There is nothing to claim")).await;
+    println!("----------------------------------------------------");
+    interactor.set_exact_value_fee(fee_token.clone(), fee_amount.clone(), fee_token.clone()).await;
+    fee_amount = BigUint::<StaticApi>::from(9u128);
+    interactor.transfer_with_miss_fee(ExpectError(4, "Mismatching payment for covering fees"),token_identifier.clone(), token_amount.clone(),fee_token.clone(),fee_amount.clone()).await;
+    println!("The transfer should fail because of the mismatching payment for covering fees and paid_fees should be empty");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    let wrong_token = TokenIdentifier::from_esdt_bytes(&b"XMAS-43a751"[..]);
+    interactor.transfer_without_proper_fee(ExpectError(4, "Wrong fee token"),token_identifier.clone(),token_amount.clone(),wrong_token,fee_amount.clone()).await;
+    println!("The transfer should fail because of the wrong fee token and paid_fees should be empty");
+    interactor.paid_fees().await;
+    println!("----------------------------------------------------");
+    interactor.transfer_without_fee(ExpectError(4, "Fee payment missing"), token_identifier.clone(), token_amount.clone() ).await;
+    println!("The transfer should fail because of the missing fee and paid_fees should be empty");
+    interactor.paid_fees().await;
+
+
+}
 

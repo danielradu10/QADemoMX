@@ -1,0 +1,9 @@
+Owner-ul seteaza in storage ExactValueFee: daca user-ul face transfer cu fee-ul corespunzator (acelasi token + acelasi amount), identic cu cel din storage, se face transferul si se salveaza fee-ul in paid_fees.
+Owner-ul seteaza in storage ExactValueFee: daca user-ul face transfer fara fee: "Fee payment missing"
+Owner-ul seteaza in storage ExactValueFee: daca user-ul face transfer cu fee, dar token diferiti: "Wrong fee token"
+Owner-ul seteaza in storage ExactValueFee: daca user-ul face transfer cu fee, acelasi token ca cel setat in storage dar amount diferit: "Mismatching payment for covering fees"
+Owner-ul seteaza in storage Percentage: se face transferul si se salveaza fee-ul in paid_fees.
+Owner-ul nu seteaza Percentage/ExactValueFee: fee-ul este Unset si se face transferul direct iar paid_fees ramane gol.
+Indiferent de ce seteaza owner-ul, daca userul face transfer de EGLD:             "EGLD transfers not allowed"
+Owner-ul da claim fara ca vectorul de fee-uri sa contina elemente: "There is nothing to claim"
+Owner-ul da claim si exista fee-uri: se transfera fee-urile
