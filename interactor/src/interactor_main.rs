@@ -232,13 +232,14 @@ impl ContractInteract {
 
     async fn transfer_with_miss_fee(    //inainte de refactor pentru ca da failed
         &mut self,
-        expected_result: ExpectError<'_>
+        expected_result: ExpectError<'_>,
+        token: TokenIdentifier<StaticApi>,
+        token_amount: BigUint<StaticApi>,
+        fee_token: TokenIdentifier<StaticApi>,
+        fee_amount: BigUint<StaticApi>
+
     ) {
-        let token_nonce = 0u64; 
-        let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
-        let fee_amount = BigUint::<StaticApi>::from(9u128);
-        let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
-        let token_amount = BigUint::<StaticApi>::from(13u64);       
+        let token_nonce = 0u64;        
 
         // doua tranzactii la rand: token-ul si fee-ul
         let mut transactions = ManagedVec::new();
@@ -580,17 +581,20 @@ async fn test_transfer_percentage_fee(){
 
 
 #[tokio::test]
-async fn test_missmatching_payment_fee(){       //da failed 
+async fn test_missmatching_payment_fee(){       
 
     let mut interactor = ContractInteract::new().await;
-     let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
-     let fee_amount = BigUint::<StaticApi>::from(10u128);
-     let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
-    // let token_amount = BigUint::<StaticApi>::from(100u64);
+    let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+    let fee_amount = BigUint::<StaticApi>::from(10u128);
+    let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
 
     interactor.deploy().await;
     interactor.set_exact_value_fee(token,fee_amount,fee_token).await;
-    interactor.transfer_with_miss_fee(ExpectError(4, "Mismatching payment for covering fees")).await;
+    let fee_token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+    let fee_amount = BigUint::<StaticApi>::from(9u128);
+    let token = TokenIdentifier::from_esdt_bytes(&b"TOKENTEST-b0b548"[..]);
+    let token_amount = BigUint::<StaticApi>::from(13u64);
+    interactor.transfer_with_miss_fee(ExpectError(4, "Mismatching payment for covering fees"),token, token_amount,fee_token,fee_amount).await;
 }
 
 #[tokio::test]
